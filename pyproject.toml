@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Flask-Dual-Auth"
+version = "1.0.0"
+description = "A simple dual auth (cookie & token) extension for Flask"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [{name = "HY-nicochichi"}]
+dependencies = [
+    "Flask>=3.0.0",
+    "PyJWT>=2.9.0",
+]
+classifiers = [
+    "Framework :: Flask",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/HY-nicochichi/Flask-Dual-Auth"
+
+[tool.setuptools.packages.find]
+where = ["src"]
