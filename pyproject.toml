@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Flask-Dual-Auth"
-version = "1.0.0"
+version = "1.0.1"
 description = "A simple dual auth (cookie & token) extension for Flask"
 readme = "README.md"
 requires-python = ">=3.13"

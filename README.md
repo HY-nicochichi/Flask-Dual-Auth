@@ -178,10 +178,9 @@ from flask import (
 )
 from flask_dual_auth import (
     AuthManager,
-    TokenErrorHandler,
     auth_required,
     get_current_user,
-    get_auth_manager,
+    token_decode_context,
     create_token,
     create_refresh_token,
     get_token_sub,
@@ -241,10 +240,8 @@ def token_refresh() -> tuple[dict, int]:
     refresh_token: str|None = json.get('refresh_token', None)
     if refresh_token is None:
         return {'msg': 'Refresh token is missing'}, 401
-    with TokenErrorHandler(get_auth_manager()) as handler:
+    with token_decode_context():
         sub: str = get_token_sub(refresh_token)
-    if handler.error_response:
-        return handler.error_response
     return {'token': create_token(sub)}, 200
 
 @app.post('/login')
@@ -275,7 +272,7 @@ if __name__ == '__main__':
 ```
 
 
-## Custom Error Responses
+## Custom Error Handlers
 
 app.py
 ```python
@@ -287,34 +284,53 @@ from flask import (
 )
 from flask_dual_auth import AuthManager
 from flask_dual_auth.errors import (
-    NO_VALID_AUTH_TYPE,
-    NO_VALID_COOKIE_SUB,
-    AUTHORIZATION_MISSING,
-    AUTHORIZATION_INVALID,
-    TOKEN_EXPIRED,
-    TOKEN_INVALID,
-    TOKEN_DECODE_FAILURE, 
-    USER_NOT_FOUND 
+    NoValidAuthType,
+    NoValidCookieSub,
+    AuthorizationMissing,
+    AuthorizationInvalid,
+    TokenExpired,
+    TokenInvalid,
+    TokenDecodeFailure
 )
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret-key'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3.0)
 
-auth_manager = AuthManager(app)
+def no_valid_auth_type_custom_handler(e: NoValidAuthType) -> tuple[Response, int]:
+    return jsonify({'msg': 'Authorization-Type header is missing or invalid'}), 200
 
-with app.app_context():
-    auth_manager.error_responses({
-        NO_VALID_AUTH_TYPE: ({'msg': 'Authorization-Type header is missing or invalid'}, 200),
-        NO_VALID_COOKIE_SUB: (jsonify({'msg': 'Cookie subject is missing or expired'}), 200),
-        AUTHORIZATION_MISSING: ('Authorization header is missing', 200),
-        AUTHORIZATION_INVALID: ('<h1>Authorization header is invalid</h1>', 200),
-        TOKEN_EXPIRED: (render_template('login.html'), 200),
-        TOKEN_INVALID: (redirect('/login'), 302),
-        TOKEN_DECODE_FAILURE: (Response(
-            '<?xml version="1.0"?><error><msg>Token decoding failed</msg></error>',
-            mimetype='application/xml'
-        ), 200)
-        # USER_NOT_FOUND is unset, so default error response is returned
-    })
-```
+def no_valid_cookie_sub_custom_handler(e: NoValidCookieSub) -> tuple[dict, int]:
+    return {'msg': 'Cookie subject is missing or expired'}, 200
+
+def authorization_missing_custom_handler(e: AuthorizationMissing) -> tuple[str, int]:
+    return 'Authorization header is missing', 200
+
+def authorization_invalid_custom_handler(e: AuthorizationInvalid) -> tuple[str, int]:
+    return '<h1>Authorization header is invalid</h1>', 200
+
+def token_expired_custom_handler(e: TokenExpired) -> tuple[str, int]:
+    return render_template('login.html'), 200
+
+def token_invalid_custom_handler(e: TokenInvalid) -> tuple[Response, int]:
+    return redirect('/login'), 302
+
+def token_decode_failure_custom_handler(e: TokenDecodeFailure) -> tuple[Response, int]:
+    return Response(
+        '<?xml version="1.0"?><error><msg>Token decoding failed</msg></error>',
+        content_type='application/xml'
+    ), 200
+
+auth_manager = AuthManager(
+    app = app,
+    custom_error_handlers = {
+        NoValidAuthType: no_valid_auth_type_custom_handler,
+        NoValidCookieSub: no_valid_cookie_sub_custom_handler,
+        AuthorizationMissing: authorization_missing_custom_handler,
+        AuthorizationInvalid: authorization_invalid_custom_handler,
+        TokenExpired: token_expired_custom_handler,
+        TokenInvalid: token_invalid_custom_handler,
+        TokenDecodeFailure: token_decode_failure_custom_handler,
+        # UserNotFound is not set, so default error handler is used
+    }
+)
